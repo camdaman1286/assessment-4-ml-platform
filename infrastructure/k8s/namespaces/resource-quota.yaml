@@ -1,0 +1,14 @@
+# Caps total resource consumption in the ml-platform namespace.
+# Prevents any single namespace from starving the rest of the cluster.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: ml-platform-quota
+  namespace: ml-platform
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: "2Gi"
+    limits.cpu: "4"
+    limits.memory: "4Gi"
+    pods: "20"

@@ -1,0 +1,19 @@
+# Sets default requests/limits for any container that doesn't specify them.
+# Prevents unbounded containers from consuming uncontrolled resources.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: ml-platform-limits
+  namespace: ml-platform
+spec:
+  limits:
+    - type: Container
+      default:
+        cpu: "250m"
+        memory: "256Mi"
+      defaultRequest:
+        cpu: "100m"
+        memory: "128Mi"
+      max:
+        cpu: "1"
+        memory: "1Gi"
