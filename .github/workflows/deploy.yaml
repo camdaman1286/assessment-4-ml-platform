@@ -1,0 +1,87 @@
+# CI/CD pipeline — triggers on push to master.
+# Builds and pushes all three service images to ECR.
+# Deploys updated manifests to EKS.
+
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER: k8s-training-cluster
+
+jobs:
+  build-and-deploy:
+    name: Build, Push, Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push model-service
+        uses: docker/build-push-action@v5
+        with:
+          context: services/model-service
+          platforms: linux/amd64
+          push: true
+          tags: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/cams-model-service:latest
+
+      - name: Build and push data-service
+        uses: docker/build-push-action@v5
+        with:
+          context: services/data-service
+          platforms: linux/amd64
+          push: true
+          tags: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/cams-data-service:latest
+
+      - name: Build and push gateway-service
+        uses: docker/build-push-action@v5
+        with:
+          context: services/gateway-service
+          platforms: linux/amd64
+          push: true
+          tags: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/cams-gateway-service:latest
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.32.0'
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ env.EKS_CLUSTER }} \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Deploy model-service
+        run: |
+          kubectl apply -f infrastructure/k8s/model-service/
+
+      - name: Deploy data-service
+        run: |
+          kubectl apply -f infrastructure/k8s/data-service/
+
+      - name: Deploy gateway-service
+        run: |
+          kubectl apply -f infrastructure/k8s/gateway-service/
+
+      - name: Verify rollouts
+        run: |
+          kubectl rollout status deployment/model-service -n default --timeout=120s
+          kubectl rollout status deployment/data-service -n ml-platform --timeout=120s
+          kubectl rollout status deployment/gateway-service -n ml-platform --timeout=120s
