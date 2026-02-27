@@ -48,3 +48,9 @@ spec:
               value: "http://model-service.default.svc.cluster.local"
             - name: DATA_SERVICE_URL
               value: "http://data-service.ml-platform.svc.cluster.local"
+            - name: FRAUD_SERVICE_URL
+              value: "http://fraud-service.ml-platform.svc.cluster.local"
+            - name: RECOMMEND_SERVICE_URL
+              value: "http://recommendations-service.ml-platform.svc.cluster.local"
+            - name: FORECAST_SERVICE_URL
+              value: "http://forecasting-service.ml-platform.svc.cluster.local"

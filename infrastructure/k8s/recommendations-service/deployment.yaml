@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: recommendations-service
+  namespace: ml-platform
+  labels:
+    app: recommendations-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: recommendations-service
+  template:
+    metadata:
+      labels:
+        app: recommendations-service
+    spec:
+      containers:
+        - name: recommendations-service
+          image: 388691194728.dkr.ecr.us-east-1.amazonaws.com/cams-recommendations-service:latest
+          ports:
+            - containerPort: 8000
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          env:
+            - name: SAGEMAKER_ENDPOINT
+              value: "cams-recommendations-endpoint-v2"
+            - name: AWS_REGION
+              value: "us-east-1"
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: aws-credentials
+                  key: AWS_SECRET_ACCESS_KEY
