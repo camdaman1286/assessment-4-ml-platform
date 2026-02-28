@@ -1,6 +1,6 @@
 # fraud-service: wraps the SageMaker XGBoost fraud detection endpoint.
-# Returns fraud probability and binary classification.
-# Failure paths: model error, timeout, unavailable.
+# Model outputs inverted probabilities — lower score = higher fraud risk.
+# Threshold set to 0.0001 based on empirical testing of output distribution.
 
 import os
 import boto3
@@ -11,18 +11,19 @@ app = FastAPI(title="fraud-service")
 
 ENDPOINT_NAME = os.getenv("SAGEMAKER_ENDPOINT", "cams-fraud-endpoint-1771690056")
 REGION = os.getenv("AWS_REGION", "us-east-1")
+FRAUD_THRESHOLD = float(os.getenv("FRAUD_THRESHOLD", "0.0001"))
 
 client = boto3.client("sagemaker-runtime", region_name=REGION)
 
 
 class FraudRequest(BaseModel):
-    # Comma-separated feature values for XGBoost
     features: str
 
 
 class FraudResponse(BaseModel):
     endpoint: str
-    fraud_probability: float
+    fraud_score: float
+    threshold: float
     prediction: str
 
 
@@ -45,10 +46,12 @@ def predict(req: FraudRequest):
             Body=req.features,
         )
         result = float(response["Body"].read().decode("utf-8").strip())
-        prediction = "fraudulent" if result > 0.5 else "legitimate"
+        # Lower score = higher fraud risk based on model output distribution
+        prediction = "fraudulent" if result < FRAUD_THRESHOLD else "legitimate"
         return FraudResponse(
             endpoint=ENDPOINT_NAME,
-            fraud_probability=result,
+            fraud_score=result,
+            threshold=FRAUD_THRESHOLD,
             prediction=prediction
         )
     except client.exceptions.ModelError as e:

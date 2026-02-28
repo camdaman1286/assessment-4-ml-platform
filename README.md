@@ -93,48 +93,45 @@ Push to master triggers the GitHub Actions pipeline which:
 1. Builds and pushes all service images to ECR
 2. Deploys updated manifests to EKS
 3. Verifies all rollouts complete successfully
+## Cost Management
 
-## Scaling Up/Down
+### Scale down when not in use
 ```bash
-# Scale up
-aws eks update-nodegroup-config   --cluster-name k8s-training-cluster   --nodegroup-name student-nodes   --scaling-config minSize=2,maxSize=4,desiredSize=2   --region us-east-1
+# Scale down EKS nodes
+aws eks update-nodegroup-config \
+  --cluster-name k8s-training-cluster \
+  --nodegroup-name student-nodes \
+  --scaling-config minSize=0,maxSize=4,desiredSize=0 \
+  --region us-east-1
 
-# Scale down
-aws eks update-nodegroup-config   --cluster-name k8s-training-cluster   --nodegroup-name student-nodes   --scaling-config minSize=0,maxSize=4,desiredSize=0   --region us-east-1
+# Delete SageMaker endpoints
+aws sagemaker delete-endpoint --endpoint-name cams-fraud-endpoint-1771690056 --region us-east-1
+aws sagemaker delete-endpoint --endpoint-name cams-recommendations-endpoint-v2 --region us-east-1
+aws sagemaker delete-endpoint --endpoint-name cams-forecasting-endpoint-v2 --region us-east-1
 ```
 
-## Debugging Common Failures
-
-### Pods not starting
+### Scale back up
 ```bash
-kubectl describe pod <pod-name> -n ml-platform
-kubectl logs <pod-name> -n ml-platform
-```
+# Scale up EKS nodes
+aws eks update-nodegroup-config \
+  --cluster-name k8s-training-cluster \
+  --nodegroup-name student-nodes \
+  --scaling-config minSize=2,maxSize=4,desiredSize=2 \
+  --region us-east-1
 
-### SageMaker calls failing
-```bash
-# Check AWS credentials secret exists
-kubectl get secret aws-credentials -n ml-platform
+# Recreate SageMaker endpoints
+aws sagemaker create-endpoint \
+  --endpoint-name cams-fraud-endpoint-1771690056 \
+  --endpoint-config-name cams-fraud-config-1771690037 \
+  --region us-east-1
 
-# Check pod env vars
-kubectl exec -n ml-platform <pod-name> -- env | grep AWS
-```
+aws sagemaker create-endpoint \
+  --endpoint-name cams-recommendations-endpoint-v2 \
+  --endpoint-config-name cams-recommendations-config-v2 \
+  --region us-east-1
 
-### Dashboard not loading
-```bash
-# Check nginx logs
-kubectl logs -n ml-platform -l app=dashboard
-
-# Check NLB target health
-aws elbv2 describe-target-health   --target-group-arn <arn>   --region us-east-1
-```
-
-### ResourceQuota exceeded
-```bash
-kubectl describe resourcequota ml-platform-quota -n ml-platform
-```
-
-### ECR auth expired
-```bash
-aws ecr get-login-password --region us-east-1 |   docker login --username AWS --password-stdin   388691194728.dkr.ecr.us-east-1.amazonaws.com
+aws sagemaker create-endpoint \
+  --endpoint-name cams-forecasting-endpoint-v2 \
+  --endpoint-config-name cams-forecasting-config-v2 \
+  --region us-east-1
 ```
